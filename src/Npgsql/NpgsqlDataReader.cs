@@ -1670,6 +1670,15 @@ public sealed class NpgsqlDataReader : DbDataReader, IDbColumnSchemaGenerator
         var result = converter.ReadAsObject(PgReader);
         PgReader.EndRead();
 
+        // Used for Entity Framework <= 6 compability
+        var objectResultType = Command.ObjectResultTypes?[ordinal];
+        if (objectResultType != null)
+        {
+            result = objectResultType == typeof(DateTimeOffset)
+                ? new DateTimeOffset((DateTime)result)
+                : Convert.ChangeType(result, objectResultType)!;
+        }
+
         return result;
     }
 
@@ -1772,7 +1781,8 @@ public sealed class NpgsqlDataReader : DbDataReader, IDbColumnSchemaGenerator
         Justification = "Members are only dynamically accessed by Npgsql via GetFieldType by GetSchema, and only in certain cases. " +
                         "Holding PublicFields and PublicProperties metadata on all our mapped types just for that case is the wrong tradeoff.")]
     public override Type GetFieldType(int ordinal)
-        => GetField(ordinal).FieldType;
+        => Command.ObjectResultTypes?[ordinal]
+           ?? GetField(ordinal).FieldType;
 
     /// <summary>
     /// Returns an <see cref="IEnumerator"/> that can be used to iterate through the rows in the data reader.
